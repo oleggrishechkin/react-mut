@@ -1,16 +1,16 @@
-/* eslint-disable @typescript-eslint/ban-types */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import { DependencyList, useCallback, useEffect, useReducer, useSyncExternalStore } from 'react';
+import { useCallback } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
+import { useSyncExternalStore } from 'use-sync-external-store/shim';
 
-const objSubs = new WeakMap<object, Set<() => void>>();
+type Obj = Record<any, any> | any[] | Set<any> | Map<any, any> | WeakSet<any> | WeakMap<any, any>;
 
-const objVersion = new WeakMap<object, object>();
+const objSubs = new WeakMap<Obj, Set<() => void>>();
 
-let batchedObjs: Set<object> | null = null;
+const objVersion = new WeakMap<Obj, Obj>();
 
-const sub = (obj: object | null | undefined, callback: () => void): (() => void) => {
+let batchedObjs: Set<Obj> | null = null;
+
+const sub = (obj: Obj | null | undefined, callback: () => void): (() => void) => {
     if (!obj) {
         return () => {};
     }
@@ -36,9 +36,9 @@ const sub = (obj: object | null | undefined, callback: () => void): (() => void)
     };
 };
 
-const ver = (obj: object | null | undefined): object | null | undefined => (obj ? objVersion.get(obj) || obj : obj);
+const ver = (obj: Obj | null | undefined): Obj | null | undefined => (obj ? objVersion.get(obj) || obj : obj);
 
-const mut = <T extends object | null | undefined>(obj: T): T => {
+const mut = <T extends Obj | null | undefined>(obj: T): T => {
     if (!obj || !objSubs.has(obj)) {
         return obj;
     }
@@ -71,56 +71,26 @@ const mut = <T extends object | null | undefined>(obj: T): T => {
 };
 
 interface UseMut {
-    <T>(selector: () => T, deps: DependencyList): T;
-    (obj: object | null | undefined): object | null | undefined;
+    (obj: Obj | null | undefined): Obj | null | undefined;
+    <T>(selector: () => T, deps: (Obj | null | undefined)[]): T;
 }
 
-const useMut: UseMut =
-    typeof useSyncExternalStore === 'undefined'
-        ? <T>(obj: (() => T) | object | null | undefined, deps?: DependencyList): T | object | null | undefined => {
-              const [, forceUpdate] = useReducer(() => ({}), {});
+const useMut: UseMut = <T>(
+    obj: Obj | null | undefined | (() => T),
+    deps?: (Obj | null | undefined)[]
+): T | Obj | null | undefined => {
+    const subscribe = useCallback((handleChange: () => void) => {
+        if (deps) {
+            const unsubs = deps.map((obj) => sub(obj, handleChange));
 
-              if (deps && typeof obj === 'function') {
-                  let value = obj();
+            return () => unsubs.forEach((unsub) => unsub());
+        }
 
-                  useEffect(() => {
-                      const callback = () => {
-                          const nextValue = obj();
+        return sub(obj, handleChange);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, deps || [obj]);
 
-                          if (nextValue !== value) {
-                              value = nextValue;
-                              forceUpdate();
-                          }
-                      };
-                      const unsubs = deps.map((obj) => sub(obj, callback));
-
-                      return () => unsubs.forEach((unsub) => unsub());
-                  }, deps);
-
-                  return value;
-              }
-
-              useEffect(() => sub(obj, forceUpdate), [obj]);
-
-              return ver(obj);
-          }
-        : <T>(obj: (() => T) | object | null | undefined, deps?: DependencyList): T | object | null | undefined => {
-              if (deps && typeof obj === 'function') {
-                  return useSyncExternalStore(
-                      useCallback((handleChange: () => void) => {
-                          const unsubs = deps.map((obj) => sub(obj, handleChange));
-
-                          return () => unsubs.forEach((unsub) => unsub());
-                          // eslint-disable-next-line react-hooks/exhaustive-deps
-                      }, deps),
-                      obj
-                  );
-              }
-
-              return useSyncExternalStore(
-                  useCallback((handleChange: () => void) => sub(obj, handleChange), [obj]),
-                  () => ver(obj)
-              );
-          };
+    return useSyncExternalStore(subscribe, deps && obj && typeof obj !== 'object' ? obj : () => ver(obj));
+};
 
 export { sub, ver, mut, useMut };

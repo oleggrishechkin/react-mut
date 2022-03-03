@@ -1,7 +1,7 @@
 {
     "name": "react-mut",
     "version": "0.1.0",
-    "description": "\uD83D\uDD17 Subscribe components to any object.",
+    "description": "🔗 Subscribe components to any object.",
     "keywords": [
         "react",
         "tagged",
@@ -34,6 +34,10 @@
         "prettier:fix": "prettier --write .",
         "prettier:fix:readme": "prettier --tab-width 2 --print-width 50 --write README.md",
         "prepare": "husky install && rimraf lib && tsc"
+    },
+    "dependencies": {
+        "@types/use-sync-external-store": "0.0.3",
+        "use-sync-external-store": "^1.0.0-rc.0"
     },
     "devDependencies": {
         "@types/react": "^17.0.2",
