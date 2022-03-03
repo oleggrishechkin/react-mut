@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-types */
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { useCallback, useEffect, useReducer, useSyncExternalStore } from 'react';
+import { DependencyList, useCallback, useEffect, useReducer, useSyncExternalStore } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 
 const objSubs = new WeakMap<object, Set<() => void>>();
@@ -70,19 +70,57 @@ const mut = <T extends object | null | undefined>(obj: T): T => {
     return obj;
 };
 
-const useMut =
+interface UseMut {
+    <T>(selector: () => T, deps: DependencyList): T;
+    (obj: object | null | undefined): object | null | undefined;
+}
+
+const useMut: UseMut =
     typeof useSyncExternalStore === 'undefined'
-        ? (obj: object | null | undefined): object | null | undefined => {
+        ? <T>(obj: (() => T) | object | null | undefined, deps?: DependencyList): T | object | null | undefined => {
               const [, forceUpdate] = useReducer(() => ({}), {});
+
+              if (deps && typeof obj === 'function') {
+                  let value = obj();
+
+                  useEffect(() => {
+                      const callback = () => {
+                          const nextValue = obj();
+
+                          if (nextValue !== value) {
+                              value = nextValue;
+                              forceUpdate();
+                          }
+                      };
+                      const unsubs = deps.map((obj) => sub(obj, callback));
+
+                      return () => unsubs.forEach((unsub) => unsub());
+                  }, deps);
+
+                  return value;
+              }
 
               useEffect(() => sub(obj, forceUpdate), [obj]);
 
               return ver(obj);
           }
-        : (obj: object | null | undefined): object | null | undefined =>
-              useSyncExternalStore(
+        : <T>(obj: (() => T) | object | null | undefined, deps?: DependencyList): T | object | null | undefined => {
+              if (deps && typeof obj === 'function') {
+                  return useSyncExternalStore(
+                      useCallback((handleChange: () => void) => {
+                          const unsubs = deps.map((obj) => sub(obj, handleChange));
+
+                          return () => unsubs.forEach((unsub) => unsub());
+                          // eslint-disable-next-line react-hooks/exhaustive-deps
+                      }, deps),
+                      obj
+                  );
+              }
+
+              return useSyncExternalStore(
                   useCallback((handleChange: () => void) => sub(obj, handleChange), [obj]),
                   () => ver(obj)
               );
+          };
 
 export { sub, ver, mut, useMut };
