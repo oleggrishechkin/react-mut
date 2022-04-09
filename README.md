@@ -143,25 +143,22 @@ const Component = () => {
 
 ## Selectors
 
-You can use selectors in `useMut` to optimize re-renders. Selector deps should be added manually as deps array.
+You can use selectors via `useSel` to optimize re-renders. You should mark mutable objects by `use` param.
 
 ```javascript
-import { mut, useMut } from 'react-mut';
+import { mut, useSel } from 'react-mut';
 
 const mutableObject = { title: 'title' };
 
 const Component = () => {
   // Subscribe to mutableObject.title change
-  const title = useMut(
-    () => mutableObject.title,
-    [mutableObject]
-  );
+  const title = useSel((use) => use(mutableObject).title);
 
   return <div>{title}</div>;
 };
 ```
 
-Please, be careful with subscribing to nested mutable objects. You should use a selector and add all mutable object parents to the deps if they can be mutated.
+Please, be careful with subscribing to nested mutable objects. You should use a selector and mark all mutable object parents.
 
 Bad:
 
@@ -172,25 +169,25 @@ const items = [{ title: 'title' }];
 
 const Component = () => {
   // `items` can be mutated (`item[0]` can be deleted, for example) and this component will be stale
-  const title = useMut(items[0]);
+  const item = useMut(items[0]);
 
-  return <div>{title}</div>;
+  return <div>{item.title}</div>;
 };
 ```
 
 Good:
 
 ```javascript
-import { mut, useMut } from 'react-mut';
+import { mut, useMut, useSel } from 'react-mut';
 
 const items = [{ title: 'title' }];
 
 const Component = () => {
   // select `item[0]`
-  const item = useMut(() => items[0], [items]);
+  const item = useSel((use) => use(items)[0]);
   // subscribe to `item`
   useMut(item);
 
-  return <div>{title}</div>;
+  return <div>{item.title}</div>;
 };
 ```
