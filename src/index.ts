@@ -16,38 +16,32 @@ const objVersion = new WeakMap<Obj, Obj>();
 const isObject = <T>(obj: T): boolean => typeof obj === 'object' && obj !== null;
 
 const unsub = (obj: any, callback: () => void) => {
-    if (!isObject(obj)) {
-        return;
+    if (isObject(obj)) {
+        const subs = objSubs.get(obj);
+
+        if (subs) {
+            if (subs.size === 1) {
+                objSubs.delete(obj);
+                objVersion.delete(obj);
+
+                return;
+            }
+
+            subs.delete(callback);
+        }
     }
-
-    const subs = objSubs.get(obj);
-
-    if (!subs) {
-        return;
-    }
-
-    if (subs.size === 1) {
-        objSubs.delete(obj);
-        objVersion.delete(obj);
-
-        return;
-    }
-
-    subs.delete(callback);
 };
 
 const sub = (obj: any, callback: () => void): (() => void) => {
-    if (!isObject(obj)) {
-        return () => {};
-    }
+    if (isObject(obj)) {
+        let subs = objSubs.get(obj);
 
-    let subs = objSubs.get(obj);
-
-    if (subs) {
-        subs.add(callback);
-    } else {
-        subs = new Set([callback]);
-        objSubs.set(obj, subs);
+        if (subs) {
+            subs.add(callback);
+        } else {
+            subs = new Set([callback]);
+            objSubs.set(obj, subs);
+        }
     }
 
     return () => unsub(obj, callback);
@@ -56,38 +50,32 @@ const sub = (obj: any, callback: () => void): (() => void) => {
 const ver = <T>(obj: T): T | Obj => (isObject(obj) ? objVersion.get(obj) || obj : obj);
 
 const mut = <T>(obj: T): T => {
-    if (!isObject(obj) || !objSubs.has(obj)) {
-        return obj;
+    if (isObject(obj) && objSubs.has(obj)) {
+        if (batchedObjs) {
+            batchedObjs.add(obj);
+        } else {
+            batchedObjs = new Set([obj]);
+            Promise.resolve().then(() => {
+                const objs = batchedObjs!;
+
+                batchedObjs = null;
+
+                const uniqueSubs = new Set<() => void>();
+
+                objs.forEach((obj) => {
+                    objVersion.set(obj, {});
+
+                    const subs = objSubs.get(obj);
+
+                    if (subs) {
+                        subs.forEach((sub) => uniqueSubs.add(sub));
+                    }
+                });
+                clock = {};
+                uniqueSubs.forEach((sub) => sub());
+            });
+        }
     }
-
-    objVersion.set(obj, {});
-
-    if (batchedObjs) {
-        batchedObjs.add(obj);
-
-        return obj;
-    }
-
-    batchedObjs = new Set([obj]);
-    Promise.resolve().then(() => {
-        const objs = batchedObjs!;
-
-        batchedObjs = null;
-
-        const uniqueSubs = new Set<() => void>();
-
-        objs.forEach((obj) => {
-            const subs = objSubs.get(obj);
-
-            if (!subs) {
-                return;
-            }
-
-            subs.forEach((sub) => uniqueSubs.add(sub));
-        });
-        clock = {};
-        uniqueSubs.forEach((sub) => sub());
-    });
 
     return obj;
 };
@@ -122,7 +110,11 @@ const useSel = <T>(sel: () => T) => {
             subscribe: (onStoreChange: () => void) => {
                 vars.current!.onStoreChange = onStoreChange;
 
-                return () => vars.current!.objs.forEach((obj) => unsub(obj, vars.current!.callback));
+                return () => {
+                    const { objs, callback } = vars.current!;
+
+                    objs.forEach((obj) => unsub(obj, callback));
+                };
             }
         };
     }
@@ -131,27 +123,35 @@ const useSel = <T>(sel: () => T) => {
     let value: T;
 
     return useSyncExternalStore(vars.current.subscribe, () => {
-        if (currentClock === clock) {
-            return value;
+        if (currentClock !== clock) {
+            currentClock = clock;
+
+            const objs = new Set<Obj>();
+
+            currentObjs = objs;
+            value = sel();
+            currentObjs = null;
+
+            const { objs: prevObjs, callback } = vars.current!;
+
+            prevObjs.forEach((obj) => {
+                if (objs.has(obj)) {
+                    return;
+                }
+
+                unsub(obj, callback);
+            });
+            objs.forEach((obj) => {
+                if (prevObjs.has(obj)) {
+                    return;
+                }
+
+                sub(obj, callback);
+            });
+            vars.current!.objs = objs;
         }
 
-        currentClock = clock;
-
-        const objs = new Set<Obj>();
-
-        currentObjs = objs;
-        value = sel();
-        currentObjs = null;
-
-        vars.current!.objs.forEach((obj) => {
-            if (objs.has(obj)) {
-                return;
-            }
-
-            unsub(obj, vars.current!.callback);
-        });
-        vars.current!.objs = objs;
-        objs.forEach((obj) => sub(obj, vars.current!.callback));
+        return value;
     });
 };
 
