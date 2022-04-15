@@ -143,16 +143,16 @@ const Component = () => {
 
 ## Selectors
 
-You can use selectors via `useSel` to optimize re-renders. You should mark mutable objects by `use` param.
+You can use selectors via `useSel` to optimize re-renders. You should mark mutable objects by `use`.
 
 ```javascript
-import { mut, useSel } from 'react-mut';
+import { mut, use, useSel } from 'react-mut';
 
 const mutableObject = { title: 'title' };
 
 const Component = () => {
   // Subscribe to mutableObject.title change
-  const title = useSel((use) => use(mutableObject).title);
+  const title = useSel(() => use(mutableObject).title);
 
   return <div>{title}</div>;
 };
@@ -178,13 +178,13 @@ const Component = () => {
 Good:
 
 ```javascript
-import { mut, useMut, useSel } from 'react-mut';
+import { mut, use, useMut, useSel } from 'react-mut';
 
 const items = [{ title: 'title' }];
 
 const Component = () => {
   // select `item[0]`
-  const item = useSel((use) => use(items)[0]);
+  const item = useSel(() => use(items)[0]);
   // subscribe to `item`
   useMut(item);
 
