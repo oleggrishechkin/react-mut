@@ -51,6 +51,9 @@ const ver = <T>(obj: T): T | Obj => (isObject(obj) ? objVersion.get(obj) || obj 
 
 const mut = <T>(obj: T): T => {
     if (isObject(obj) && objSubs.has(obj)) {
+        clock = {};
+        objVersion.set(obj, {});
+
         if (batchedObjs) {
             batchedObjs.add(obj);
         } else {
@@ -63,15 +66,12 @@ const mut = <T>(obj: T): T => {
                 const uniqueSubs = new Set<() => void>();
 
                 objs.forEach((obj) => {
-                    objVersion.set(obj, {});
-
                     const subs = objSubs.get(obj);
 
                     if (subs) {
                         subs.forEach((sub) => uniqueSubs.add(sub));
                     }
                 });
-                clock = {};
                 uniqueSubs.forEach((sub) => sub());
             });
         }
