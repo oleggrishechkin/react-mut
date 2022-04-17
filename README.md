@@ -113,7 +113,7 @@ mut(mutableObject).title = 'next title';
 
 ## Versions
 
-When you call `mut` with object and object has subscribers, object version will be updated. Version will be deleted if object has no subscribers. Version is empty object or object itself. You can read object current version by calling `ver` with this object. `useMut` returns object version too.
+When you call `mut` with object and object has subscribers, object version will be updated. Version will be deleted if object has no subscribers. Version is empty object or object itself. You can read object current version by calling `ver` with this object.
 
 ```javascript
 import { mut, useMut } from 'react-mut';
@@ -121,12 +121,12 @@ import { mut, useMut } from 'react-mut';
 const mutableObject = { title: 'title' };
 
 const Component = () => {
-  const version = useMut(mutableObject);
+  useMut(mutableObject);
 
   // version can be used as dependency
   useEffect(() => {
     console.log(mutableObject);
-  }, [version]);
+  }, [ver(mutableObject)]);
 
   return (
     <button

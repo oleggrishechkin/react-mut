@@ -88,11 +88,14 @@ const use = <T>(obj: T) => {
     return obj;
 };
 
-const useMut = <T>(obj: T) =>
+const useMut = <T>(obj: T) => {
     useSyncExternalStore(
         useCallback((handleChange: () => void) => sub(obj, handleChange), [obj]),
         () => ver(obj)
     );
+
+    return obj;
+};
 
 const useSel = <T>(sel: () => T) => {
     const vars = useRef<{
