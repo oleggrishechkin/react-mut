@@ -7,7 +7,9 @@
 [![NPM total downloads](https://img.shields.io/npm/dt/react-mut.svg?style=flat)](https://npmcharts.com/compare/react-mut?minimal=true)
 [![NPM monthly downloads](https://img.shields.io/npm/dm/react-mut.svg?style=flat)](https://npmcharts.com/compare/react-mut?minimal=true)
 
-🔗 Subscribe components to any object.
+🔗 Subscribe component to any object.
+
+Click [here](https://codesandbox.io/s/react-mut-vguu9j) to see sandbox.
 
 ## Basics
 
@@ -16,17 +18,16 @@ Subscribe with `useMut` → Mutate object → Notify subscribers with `mut`
 ```javascript
 import { mut, useMut } from 'react-mut';
 
-// any object or function (arrays, maps, sets, etc.)
 const mutableObject = { title: 'title' };
 
 const Component = () => {
-  // subscribe to `mutableObject`
+  // subscribe
   useMut(mutableObject);
 
   return (
     <button
       onClick={() => {
-        // notify `mutableObject` subscribers
+        // mutate and notify subscribers
         mut(mutableObject).title = 'next title';
       }}
     >
@@ -36,22 +37,18 @@ const Component = () => {
 };
 ```
 
-## Batching
+## Mutations
 
-`mut` is batched. Notify is scheduled via microtask. So you can call `mut` anytime (before mutation or after mutation).
+You can mark objects as mutated via `mut`.<br>
+You can call `mut` anytime (before mutation and after mutation).
 
 ```javascript
 import { mut } from 'react-mut';
 
-const mutableObject = {
-  title: 'title',
-  description: 'description'
-};
+const mutableObject = { title: 'title'};
 
 // before mutation:
 mut(mutableObject).title = 'next title';
-mut(mutableObject).description =
-  'next description';
 
 // or after mutation:
 mutableObject.title = 'next title';
@@ -63,57 +60,11 @@ Object.assign(mut(mutableObject), {
 });
 ```
 
-## Props
-
-You can use objects from props with `useMut`.
-
-```javascript
-import { mut, useMut } from 'react-mut';
-
-const items = [{ name: 'name' }];
-
-const Item = ({ data }) => {
-  useMut(data);
-
-  return <div>{data.name}</div>;
-};
-
-const List = () => {
-  useMut(items);
-
-  return items.map((item) => (
-    <Item data={item} />
-  ));
-};
-
-// first Item will be re-rendered but List will not.
-mut(items[0]).name = 'next name';
-```
-
-## Subscriptions
-
-You can manually subscribe to object with `sub`.
-
-```javascript
-import { sub, mut } from 'react-mut';
-
-const mutableObject = {
-  title: 'title',
-  description: 'description'
-};
-
-// subscribe
-sub(mutableObject, () => {
-  // will be logged after `mut` call with `mutableObject`.
-  console.log(mutableObject);
-});
-
-mut(mutableObject).title = 'next title';
-```
-
 ## Versions
 
-When you call `mut` with object and object has subscribers, object version will be updated. Version will be deleted if object has no subscribers. Version is empty object or object itself. You can read object current version by calling `ver` with this object.
+When you call `mut` with object, object's version will be updated.<br>
+You can read object's version with `ver`.<br>
+It's useful for hook's dependencies.
 
 ```javascript
 import { mut, useMut } from 'react-mut';
@@ -123,15 +74,14 @@ const mutableObject = { title: 'title' };
 const Component = () => {
   useMut(mutableObject);
 
-  // version can be used as dependency
   useEffect(() => {
+    // Will be logged on button below click
     console.log(mutableObject);
   }, [ver(mutableObject)]);
 
   return (
     <button
       onClick={() => {
-        // `mutableObject` version will be updated
         mut(mutableObject).title = 'next title';
       }}
     >
@@ -141,52 +91,63 @@ const Component = () => {
 };
 ```
 
-## Selectors
+## Subscriptions
 
-You can use selectors via `useSel` to optimize re-renders. You should mark mutable objects by `use`.
+You can subscribe to object with `sub`.
 
 ```javascript
-import { mut, use, useSel } from 'react-mut';
+import { sub, mut } from 'react-mut';
 
 const mutableObject = { title: 'title' };
 
+sub(mutableObject, () => {
+  // will be logged on mutableObject's version change.
+  console.log(mutableObject);
+});
+```
+
+## Hooks
+
+You can use `useMut` to subscribe component to object.
+
+```javascript
+import { mut, useMut } from 'react-mut';
+
+const mutableObject = { title: 'title' };
+
+// Will be re-rendered on mutableObject's version change
 const Component = () => {
-  // Subscribe to mutableObject.title change
-  const title = useSel(() => use(mutableObject).title);
+  const title = useMut(mutableObject);
 
   return <div>{title}</div>;
 };
 ```
 
-Please, be careful with subscribing to nested mutable objects. You should use a selector and mark all mutable object parents.
-
-Bad:
+You can use selectors with `useSel` to optimize re-renders.
 
 ```javascript
-import { mut, useMut } from 'react-mut';
+import { mut, useSel } from 'react-mut';
 
-const items = [{ title: 'title' }];
+const mutableObject = { title: 'title' };
 
+// Will be re-rendered on mutableObject.title change
 const Component = () => {
-  // `items` can be mutated (`item[0]` can be deleted, for example) and this component will be stale
-  const item = useMut(items[0]);
+  const title = useSel(() => mutableObject.title);
 
-  return <div>{item.title}</div>;
+  return <div>{title}</div>;
 };
 ```
 
-Good:
+Also, you can use `useMutSel` for subscribing to nested mutable objects.
 
 ```javascript
-import { mut, use, useMut, useSel } from 'react-mut';
+import { mut, useMutSel } from 'react-mut';
 
 const items = [{ title: 'title' }];
 
+// Will be re-rendered on items[0]'s version change
 const Component = () => {
-  // select `item[0]`
-  const item = useSel(() => use(items)[0]);
-  // subscribe to `item`
-  useMut(item);
+  const item = useMutSel(() => items[0]);
 
   return <div>{item.title}</div>;
 };
