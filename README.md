@@ -117,9 +117,9 @@ const mutableObject = { title: 'title' };
 
 // Will be re-rendered on mutableObject's version change
 const Component = () => {
-  const title = useMut(mutableObject);
+  const mutableObject = useMut(mutableObject);
 
-  return <div>{title}</div>;
+  return <div>{mutableObject.title}</div>;
 };
 ```
 

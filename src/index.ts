@@ -49,7 +49,7 @@ export const sub = <T>(object: T, callback: () => void): (() => void) => {
     };
 };
 
-export const mut = <T extends void>(object: T): T => {
+export const mut = <T>(object: T): T => {
     const isBatched = batchedObjects !== null;
 
     if (batchedObjects === null) {
