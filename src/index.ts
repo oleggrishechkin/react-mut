@@ -6,14 +6,9 @@ type Version = any;
 
 const selectorObject = {};
 
-type Subscriber = {
-    callback: () => void;
-    version: Version;
-};
-
 let batchedObjects: Set<AnyObject> | null = null;
 
-const objectSubscribers = new WeakMap<AnyObject, Set<Subscriber>>();
+const objectSubscribers = new WeakMap<AnyObject, Set<() => void>>();
 
 const objectVersion = new WeakMap<AnyObject, Version>();
 
@@ -23,13 +18,12 @@ export const ver = <T>(object: T): T | Version => (isObject(object) ? objectVers
 
 export const sub = <T>(object: T, callback: () => void): (() => void) => {
     if (isObject(object)) {
-        const subscriber = { callback, version: ver(object) };
         const subscribers = objectSubscribers.get(object);
 
         if (subscribers) {
-            subscribers.add(subscriber);
+            subscribers.add(callback);
         } else {
-            objectSubscribers.set(object, new Set([subscriber]));
+            objectSubscribers.set(object, new Set([callback]));
         }
 
         return () => {
@@ -40,7 +34,7 @@ export const sub = <T>(object: T, callback: () => void): (() => void) => {
                     objectSubscribers.delete(object);
                     objectVersion.delete(object);
                 } else {
-                    subscribers.delete(subscriber);
+                    subscribers.delete(callback);
                 }
             }
         };
@@ -61,14 +55,7 @@ export const mut = <T>(object: T): T => {
                     const subscribers = objectSubscribers.get(object);
 
                     if (subscribers) {
-                        const version = ver(object);
-
-                        subscribers.forEach((subscriber) => {
-                            if (subscriber.version !== version) {
-                                subscriber.version = version;
-                                subscriber.callback();
-                            }
-                        });
+                        subscribers.forEach((subscriber) => subscriber());
                     }
                 });
             }
