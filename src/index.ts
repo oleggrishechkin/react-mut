@@ -12,9 +12,24 @@ const objectSubscribers = new WeakMap<AnyObject, Set<() => void>>();
 
 const objectVersion = new WeakMap<AnyObject, Version>();
 
-const isObject = <T>(object: T) => typeof object === 'object' && object !== null;
+const isObject = <T>(object: T) => typeof object === 'function' || (typeof object === 'object' && object !== null);
 
 export const ver = <T>(object: T): T | Version => (isObject(object) ? objectVersion.get(object) || object : object);
+
+export const unsub = <T>(object: T, callback: () => void): void => {
+    if (isObject(object)) {
+        const subscribers = objectSubscribers.get(object);
+
+        if (subscribers) {
+            subscribers.delete(callback);
+
+            if (!subscribers.size) {
+                objectSubscribers.delete(object);
+                objectVersion.delete(object);
+            }
+        }
+    }
+};
 
 export const sub = <T>(object: T, callback: () => void): (() => void) => {
     if (isObject(object)) {
@@ -25,40 +40,28 @@ export const sub = <T>(object: T, callback: () => void): (() => void) => {
         } else {
             objectSubscribers.set(object, new Set([callback]));
         }
-
-        return () => {
-            const subscribers = objectSubscribers.get(object);
-
-            if (subscribers) {
-                if (subscribers.size === 1) {
-                    objectSubscribers.delete(object);
-                    objectVersion.delete(object);
-                } else {
-                    subscribers.delete(callback);
-                }
-            }
-        };
     }
 
-    return () => {};
+    return () => unsub(object, callback);
 };
 
+let mutPromise: Promise<void> | null = null;
+
 export const mut = <T>(object: T): T => {
-    if (batchedObjects === null) {
+    if (!batchedObjects) {
         batchedObjects = new Set();
-        Promise.resolve().then(() => {
-            if (batchedObjects !== null) {
-                const objects = batchedObjects;
+        mutPromise = Promise.resolve().then(() => {
+            const objects = batchedObjects!;
 
-                batchedObjects = null;
-                objects.forEach((object) => {
-                    const subscribers = objectSubscribers.get(object);
+            batchedObjects = null;
+            objects.forEach((object) => {
+                const subscribers = objectSubscribers.get(object);
 
-                    if (subscribers) {
-                        subscribers.forEach((subscriber) => subscriber());
-                    }
-                });
-            }
+                if (subscribers) {
+                    subscribers.forEach((subscriber) => subscriber());
+                }
+            });
+            mutPromise = null;
         });
     }
 
@@ -73,6 +76,12 @@ export const mut = <T>(object: T): T => {
     }
 
     return object;
+};
+
+export const flush = async (): Promise<void> => {
+    if (mutPromise) {
+        await mutPromise;
+    }
 };
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -107,27 +116,14 @@ const useSyncExternalStoreShim =
           }
         : useSyncExternalStore;
 
-export const useMut =
-    typeof useSyncExternalStore === undefined
-        ? <T>(object: T): T => {
-              const [, setState] = useState(() => ver(object));
+export const useMut = <T>(object: T): T => {
+    useSyncExternalStoreShim(
+        useCallback((handleChange) => sub(object, handleChange), [object]),
+        () => ver(object)
+    );
 
-              useEffect(() => {
-                  setState(ver(object));
-
-                  return sub(object, () => setState(ver(object)));
-              }, [object]);
-
-              return object;
-          }
-        : <T>(object: T): T => {
-              useSyncExternalStoreShim(
-                  useCallback((handleChange) => sub(object, handleChange), [object]),
-                  () => ver(object)
-              );
-
-              return object;
-          };
+    return object;
+};
 
 export const useSel = <T>(sel: () => T): T =>
     useSyncExternalStoreShim(
@@ -139,12 +135,10 @@ export const useSel = <T>(sel: () => T): T =>
             return () => {
                 const version = ver(selectorObject);
 
-                if (version === currentVersion) {
-                    return value;
+                if (version !== currentVersion) {
+                    currentVersion = version;
+                    value = sel();
                 }
-
-                currentVersion = version;
-                value = sel();
 
                 return value;
             };

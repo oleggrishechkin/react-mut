@@ -60,6 +60,23 @@ Object.assign(mut(mutableObject), {
 });
 ```
 
+You can use `flush` to await mut microtask.<br>
+It can be useful for tests, for example.
+
+```javascript
+import { flush } from 'react-mut';
+
+const mutableObject = { title: 'title'};
+
+const action = async () => {
+    mut(mutableObject).title = 'next title';
+
+    // await mut microtask
+    await flush();
+};
+
+```
+
 ## Versions
 
 When you call `mut` with object, object's version will be updated.<br>
@@ -100,10 +117,29 @@ import { sub, mut } from 'react-mut';
 
 const mutableObject = { title: 'title' };
 
-sub(mutableObject, () => {
+const unsubscribe = sub(mutableObject, () => {
   // will be logged on mutableObject's version change.
   console.log(mutableObject);
 });
+
+unsubscribe();
+```
+
+You also can unsubscribe from object with `unsub`
+
+```javascript
+import { unsub, sub, mut } from 'react-mut';
+
+const mutableObject = { title: 'title' };
+
+const callback = () => {
+    // will be logged on mutableObject's version change.
+    console.log(mutableObject);
+}
+
+sub(mutableObject, callback);
+
+unsub(mutableObject, callback);
 ```
 
 ## Hooks
