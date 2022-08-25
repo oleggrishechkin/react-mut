@@ -16,14 +16,20 @@ const isObject = <T>(object: T) => typeof object === 'function' || (typeof objec
 
 export const ver = <T>(object: T): T | Version => (isObject(object) ? objectVersion.get(object) || object : object);
 
-export const unsub = <T>(object: T, callback: () => void): void => {
+export const unsub = <T>(object: T, callback?: () => void): void => {
     if (isObject(object)) {
         const subscribers = objectSubscribers.get(object);
 
         if (subscribers) {
-            subscribers.delete(callback);
+            if (callback) {
+                subscribers.delete(callback);
 
-            if (!subscribers.size) {
+                if (!subscribers.size) {
+                    objectSubscribers.delete(object);
+                    objectVersion.delete(object);
+                }
+            } else {
+                subscribers.clear();
                 objectSubscribers.delete(object);
                 objectVersion.delete(object);
             }
@@ -47,22 +53,31 @@ export const sub = <T>(object: T, callback: () => void): (() => void) => {
 
 let mutPromise: Promise<void> | null = null;
 
-export const mut = <T>(object: T): T => {
-    if (!batchedObjects) {
-        batchedObjects = new Set();
-        mutPromise = Promise.resolve().then(() => {
-            const objects = batchedObjects!;
+export const sync = (): void => {
+    if (mutPromise) {
+        while (batchedObjects) {
+            const objects = batchedObjects;
 
             batchedObjects = null;
-            objects.forEach((object) => {
+
+            for (const object of objects) {
                 const subscribers = objectSubscribers.get(object);
 
                 if (subscribers) {
-                    subscribers.forEach((subscriber) => subscriber());
+                    for (const subscriber of subscribers) {
+                        subscriber();
+                    }
                 }
-            });
-            mutPromise = null;
-        });
+            }
+        }
+
+        mutPromise = null;
+    }
+};
+
+export const mut = <T>(object: T): T => {
+    if (!batchedObjects) {
+        batchedObjects = new Set();
     }
 
     if (objectSubscribers.has(selectorObject)) {
@@ -75,13 +90,11 @@ export const mut = <T>(object: T): T => {
         objectVersion.set(object, {});
     }
 
-    return object;
-};
-
-export const flush = async (): Promise<void> => {
-    if (mutPromise) {
-        await mutPromise;
+    if (!mutPromise) {
+        mutPromise = Promise.resolve().then(sync);
     }
+
+    return object;
 };
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;

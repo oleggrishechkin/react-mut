@@ -15,7 +15,7 @@ Click [here](https://codesandbox.io/s/react-mut-vguu9j) to see sandbox.
 
 Subscribe with `useMut` → Mutate object → Notify subscribers with `mut`
 
-```javascript
+```typescript jsx
 import { mut, useMut } from 'react-mut';
 
 const mutableObject = { title: 'title' };
@@ -39,10 +39,10 @@ const Component = () => {
 
 ## Mutations
 
-You can mark objects as mutated via `mut`.<br>
+You can mark objects as mutated with `mut`.<br>
 You can call `mut` anytime (before mutation and after mutation).
 
-```javascript
+```typescript jsx
 import { mut } from 'react-mut';
 
 const mutableObject = { title: 'title'};
@@ -60,30 +60,31 @@ Object.assign(mut(mutableObject), {
 });
 ```
 
-You can use `flush` to await mut microtask.<br>
+Notifying subscribers scheduled via microtask.<br>
+But you can immediately notify subscribers with `sync`.<br>
 It can be useful for tests, for example.
 
-```javascript
-import { flush } from 'react-mut';
+```typescript jsx
+import { sync } from 'react-mut';
 
 const mutableObject = { title: 'title'};
 
-const action = async () => {
+const action = () => {
     mut(mutableObject).title = 'next title';
 
-    // await mut microtask
-    await flush();
+    // immediately notify subscribers
+    sync();
 };
 
 ```
 
 ## Versions
 
-When you call `mut` with object, object's version will be updated.<br>
+When you call `mut` with object, object's version updated.<br>
 You can read object's version with `ver`.<br>
-It's useful for hook's dependencies.
+It can be useful for hook's dependencies, for example.
 
-```javascript
+```typescript jsx
 import { mut, useMut } from 'react-mut';
 
 const mutableObject = { title: 'title' };
@@ -110,9 +111,10 @@ const Component = () => {
 
 ## Subscriptions
 
-You can subscribe to object with `sub`.
+You can subscribe to object with `sub`.<br>
+You can unsubscribe from object with returned callback.
 
-```javascript
+```typescript jsx
 import { sub, mut } from 'react-mut';
 
 const mutableObject = { title: 'title' };
@@ -125,9 +127,10 @@ const unsubscribe = sub(mutableObject, () => {
 unsubscribe();
 ```
 
-You also can unsubscribe from object with `unsub`
+You also can unsubscribe from object with `unsub`.<br>
+You can unsubscribe all from object with `unsub` without callback.
 
-```javascript
+```typescript jsx
 import { unsub, sub, mut } from 'react-mut';
 
 const mutableObject = { title: 'title' };
@@ -137,16 +140,26 @@ const callback = () => {
     console.log(mutableObject);
 }
 
+// subscribe callback to mutableObject
 sub(mutableObject, callback);
 
+// unsubscribe callback from mutableObject
 unsub(mutableObject, callback);
+
+// subscribe anonymus callback to mutableObject
+sub(mutableObject, () => {
+    console.log(mutableObject);
+});
+// unsubscribe all callbacks from mutableObject
+unsub(mutableObject);
 ```
 
 ## Hooks
 
-You can use `useMut` to subscribe component to object.
+You can use `useMut` to subscribe component to object.<br>
+Component will be re-rendered after `mut` call with object.
 
-```javascript
+```typescript jsx
 import { mut, useMut } from 'react-mut';
 
 const mutableObject = { title: 'title' };
@@ -159,9 +172,11 @@ const Component = () => {
 };
 ```
 
-You can use selectors with `useSel` to optimize re-renders.
+You can use selectors with `useSel` to optimize re-renders.<br>
+Selector will be called after `mut` call with **any** object.<br>
+Component will be re-rendered if selected value changed.
 
-```javascript
+```typescript jsx
 import { mut, useSel } from 'react-mut';
 
 const mutableObject = { title: 'title' };
@@ -175,8 +190,10 @@ const Component = () => {
 ```
 
 Also, you can use `useMutSel` for subscribing to nested mutable objects.
+Selector will be called after `mut` call with **any** object.<br>
+It's alias for `useMut(useSel(...))`;
 
-```javascript
+```typescript jsx
 import { mut, useMutSel } from 'react-mut';
 
 const items = [{ title: 'title' }];
