@@ -39,13 +39,14 @@ export const unsub = <T>(object: T, callback?: () => void): void => {
 
 export const sub = <T>(object: T, callback: () => void): (() => void) => {
     if (isObject(object)) {
-        const subscribers = objectSubscribers.get(object);
+        let subscribers = objectSubscribers.get(object);
 
-        if (subscribers) {
-            subscribers.add(callback);
-        } else {
-            objectSubscribers.set(object, new Set([callback]));
+        if (!subscribers) {
+            subscribers = new Set();
+            objectSubscribers.set(object, subscribers);
         }
+
+        subscribers.add(callback);
     }
 
     return () => unsub(object, callback);
@@ -54,7 +55,7 @@ export const sub = <T>(object: T, callback: () => void): (() => void) => {
 let mutPromise: Promise<void> | null = null;
 
 export const sync = (): void => {
-    if (mutPromise) {
+    if (batchedObjects) {
         while (batchedObjects) {
             const objects = batchedObjects;
 
@@ -70,9 +71,9 @@ export const sync = (): void => {
                 }
             }
         }
-
-        mutPromise = null;
     }
+
+    mutPromise = null;
 };
 
 export const mut = <T>(object: T): T => {
@@ -91,7 +92,13 @@ export const mut = <T>(object: T): T => {
     }
 
     if (!mutPromise) {
-        mutPromise = Promise.resolve().then(sync);
+        const promise = Promise.resolve().then(() => {
+            if (mutPromise === promise) {
+                sync();
+            }
+        });
+
+        mutPromise = promise;
     }
 
     return object;
