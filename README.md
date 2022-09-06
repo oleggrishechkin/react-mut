@@ -45,7 +45,7 @@ You can call `mut` anytime (before mutation and after mutation).
 ```typescript jsx
 import { mut } from 'react-mut';
 
-const mutableObject = { title: 'title'};
+const mutableObject = { title: 'title' };
 
 // before mutation:
 mut(mutableObject).title = 'next title';
@@ -56,7 +56,7 @@ mut(mutableObject);
 
 // this will work too:
 Object.assign(mut(mutableObject), {
-  title: 'next title'
+  title: 'next title',
 });
 ```
 
@@ -67,15 +67,14 @@ It can be useful for tests, for example.
 ```typescript jsx
 import { sync } from 'react-mut';
 
-const mutableObject = { title: 'title'};
+const mutableObject = { title: 'title' };
 
 const action = () => {
-    mut(mutableObject).title = 'next title';
+  mut(mutableObject).title = 'next title';
 
-    // immediately notify subscribers
-    sync();
+  // immediately notify subscribers
+  sync();
 };
-
 ```
 
 ## Versions
@@ -136,9 +135,9 @@ import { unsub, sub, mut } from 'react-mut';
 const mutableObject = { title: 'title' };
 
 const callback = () => {
-    // will be logged on mutableObject's version change.
-    console.log(mutableObject);
-}
+  // will be logged on mutableObject's version change.
+  console.log(mutableObject);
+};
 
 // subscribe callback to mutableObject
 sub(mutableObject, callback);
@@ -148,7 +147,7 @@ unsub(mutableObject, callback);
 
 // subscribe anonymus callback to mutableObject
 sub(mutableObject, () => {
-    console.log(mutableObject);
+  console.log(mutableObject);
 });
 // unsubscribe all callbacks from mutableObject
 unsub(mutableObject);

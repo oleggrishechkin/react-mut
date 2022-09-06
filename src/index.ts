@@ -139,7 +139,7 @@ const useSyncExternalStoreShim =
 export const useMut = <T>(object: T): T => {
     useSyncExternalStoreShim(
         useCallback((handleChange) => sub(object, handleChange), [object]),
-        () => ver(object)
+        () => ver(object),
     );
 
     return object;
@@ -162,7 +162,7 @@ export const useSel = <T>(sel: () => T): T =>
 
                 return value;
             };
-        }, [sel])
+        }, [sel]),
     );
 
 export const useMutSel = <T>(sel: () => T): T => useMut(useSel(sel));
