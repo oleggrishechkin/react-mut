@@ -169,6 +169,13 @@ const Component = () => {
 
   return <div>{mutableObject.title}</div>;
 };
+
+// Will be re-rendered on mutableObject.title change
+const AnotherComponent = () => {
+    const title = useMut(mutableObject, () => title);
+
+    return <div>{title}</div>;
+};
 ```
 
 You can use selectors with `useSel` to optimize re-renders.<br>

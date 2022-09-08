@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
 type AnyObject = any;
 
@@ -28,11 +28,13 @@ export const unsub = <T>(object: T, callback?: () => void): void => {
                     objectSubscribers.delete(object);
                     objectVersion.delete(object);
                 }
-            } else {
-                subscribers.clear();
-                objectSubscribers.delete(object);
-                objectVersion.delete(object);
+
+                return;
             }
+
+            subscribers.clear();
+            objectSubscribers.delete(object);
+            objectVersion.delete(object);
         }
     }
 };
@@ -55,19 +57,17 @@ export const sub = <T>(object: T, callback: () => void): (() => void) => {
 let mutPromise: Promise<void> | null = null;
 
 export const sync = (): void => {
-    if (batchedObjects) {
-        while (batchedObjects) {
-            const objects = batchedObjects;
+    while (batchedObjects) {
+        const objects = batchedObjects;
 
-            batchedObjects = null;
+        batchedObjects = null;
 
-            for (const object of objects) {
-                const subscribers = objectSubscribers.get(object);
+        for (const object of objects) {
+            const subscribers = objectSubscribers.get(object);
 
-                if (subscribers) {
-                    for (const subscriber of subscribers) {
-                        subscriber();
-                    }
+            if (subscribers) {
+                for (const subscriber of subscribers) {
+                    subscriber();
                 }
             }
         }
@@ -104,65 +104,40 @@ export const mut = <T>(object: T): T => {
     return object;
 };
 
-const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+export interface UseMut {
+    <T>(object: T): T;
+    <T, K>(object: T, sel: () => K): K;
+}
 
-const useSyncExternalStoreShim =
-    typeof useSyncExternalStore === 'undefined'
-        ? <T>(subscribe: (callback: () => void) => () => void, getSnapshot: () => T): T => {
-              const value = getSnapshot();
-              const [{ inst }, forceUpdate] = useState({ inst: { value, getSnapshot } });
-
-              useIsomorphicLayoutEffect(() => {
-                  inst.value = value;
-                  inst.getSnapshot = getSnapshot;
-
-                  if (inst.value !== inst.getSnapshot()) {
-                      forceUpdate({ inst });
-                  }
-              }, [subscribe, value, getSnapshot]);
-              useEffect(() => {
-                  if (inst.value !== inst.getSnapshot()) {
-                      forceUpdate({ inst });
-                  }
-
-                  return subscribe(() => {
-                      if (inst.value !== inst.getSnapshot()) {
-                          forceUpdate({ inst });
-                      }
-                  });
-              }, [inst, subscribe]);
-
-              return value;
-          }
-        : useSyncExternalStore;
-
-export const useMut = <T>(object: T): T => {
-    useSyncExternalStoreShim(
-        useCallback((handleChange) => sub(object, handleChange), [object]),
-        () => ver(object),
-    );
-
-    return object;
-};
-
-export const useSel = <T>(sel: () => T): T =>
-    useSyncExternalStoreShim(
-        useCallback((handleChange) => sub(selectorObject, handleChange), []),
+export const useMut: UseMut = <T, K>(object: T, sel?: () => K): T | K => {
+    const value = useSyncExternalStore(
+        useCallback((onStoreChange) => sub(object, onStoreChange), [object]),
         useMemo(() => {
-            let currentVersion: Version;
-            let value: T;
+            if (!sel) {
+                return () => ver(object);
+            }
+
+            let value: any = {};
+            let selected: K;
 
             return () => {
-                const version = ver(selectorObject);
+                const nextValue = ver(object);
 
-                if (version !== currentVersion) {
-                    currentVersion = version;
-                    value = sel();
+                if (nextValue === value) {
+                    return selected;
                 }
 
-                return value;
+                value = nextValue;
+                selected = sel();
+
+                return selected;
             };
-        }, [sel]),
+        }, [sel, object]),
     );
 
-export const useMutSel = <T>(sel: () => T): T => useMut(useSel(sel));
+    return sel ? value : object;
+};
+
+export const useSel = <T>(sel: () => T) => useMut(selectorObject, sel);
+
+export const useMutSel = <T>(sel: () => T) => useMut(useSel(sel));
