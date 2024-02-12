@@ -81,14 +81,22 @@ export const mut = <T>(object: T): T => {
         batchedObjects = new Set();
     }
 
-    if (objectSubscribers.has(selectorObject)) {
-        batchedObjects.add(selectorObject);
+    if (!batchedObjects.has(selectorObject)) {
         objectVersion.set(selectorObject, {});
     }
 
-    if (isObject(object) && objectSubscribers.has(object)) {
-        batchedObjects.add(object);
-        objectVersion.set(object, {});
+    if (objectSubscribers.has(selectorObject)) {
+        batchedObjects.add(selectorObject);
+    }
+
+    if (isObject(object)) {
+        if (!batchedObjects.has(object)) {
+            objectVersion.set(object, {});
+        }
+
+        if (objectSubscribers.has(object)) {
+            batchedObjects.add(object);
+        }
     }
 
     if (!mutPromise) {
